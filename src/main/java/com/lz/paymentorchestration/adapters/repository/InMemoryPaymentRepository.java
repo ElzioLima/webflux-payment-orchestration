@@ -1,7 +1,9 @@
 package com.lz.paymentorchestration.adapters.repository;
 
 import com.lz.paymentorchestration.domain.payment.Payment;
+import com.lz.paymentorchestration.domain.payment.enums.PaymentStatus;
 import com.lz.paymentorchestration.ports.out.PaymentRepository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -42,5 +44,11 @@ public class InMemoryPaymentRepository implements PaymentRepository {
                                 payment.getPaymentMethod().name().equals(paymentMethod))
                         .filter(payment -> !payment.getStatus().isFinalStatus())
                         .findFirst());
+    }
+
+    @Override
+    public Flux<Payment> findByStatus(PaymentStatus status) {
+        return Flux.fromIterable(storage.values())
+                .filter(payment -> payment.getStatus() == status);
     }
 }

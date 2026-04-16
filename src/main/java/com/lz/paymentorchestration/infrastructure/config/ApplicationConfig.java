@@ -1,29 +1,40 @@
 package com.lz.paymentorchestration.infrastructure.config;
 
-import com.lz.paymentorchestration.adapters.provider.local.LocalPaymentProviderGateway;
 import com.lz.paymentorchestration.adapters.repository.InMemoryAuditRepository;
+import com.lz.paymentorchestration.adapters.repository.InMemoryCustomerReviewDataGateway;
 import com.lz.paymentorchestration.adapters.repository.InMemoryOrderRepository;
 import com.lz.paymentorchestration.adapters.repository.InMemoryPaymentRepository;
 import com.lz.paymentorchestration.application.service.PaymentPrecheckService;
 import com.lz.paymentorchestration.application.service.ProviderStatusMapper;
 import com.lz.paymentorchestration.application.usecase.CreatePaymentUseCase;
+import com.lz.paymentorchestration.application.usecase.GetManualReviewQueueUseCase;
 import com.lz.paymentorchestration.application.usecase.GetPaymentUseCase;
 import com.lz.paymentorchestration.application.usecase.HandlePaymentWebhookUseCase;
 import com.lz.paymentorchestration.application.usecase.impl.CreatePaymentUseCaseImpl;
+import com.lz.paymentorchestration.application.usecase.impl.GetManualReviewQueueUseCaseImpl;
 import com.lz.paymentorchestration.application.usecase.impl.GetPaymentUseCaseImpl;
 import com.lz.paymentorchestration.application.usecase.impl.HandlePaymentWebhookUseCaseImpl;
+import com.lz.paymentorchestration.domain.payment.policy.ManualReviewQueuePolicy;
 import com.lz.paymentorchestration.domain.payment.vo.Money;
 import com.lz.paymentorchestration.entrypoint.http.handler.ApiErrorHandler;
 import com.lz.paymentorchestration.entrypoint.http.handler.PaymentHandler;
 import com.lz.paymentorchestration.entrypoint.http.handler.PaymentWebhookHandler;
 import com.lz.paymentorchestration.ports.out.AuditRepository;
+import com.lz.paymentorchestration.ports.out.CustomerReviewDataGateway;
 import com.lz.paymentorchestration.ports.out.OrderRepository;
 import com.lz.paymentorchestration.ports.out.PaymentProviderGateway;
 import com.lz.paymentorchestration.ports.out.PaymentRepository;
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.math.BigDecimal;
+
+@EnableConfigurationProperties({
+        ProviderProperties.class,
+        ManualReviewQueueProperties.class
+})
 
 @Configuration
 public class ApplicationConfig {
@@ -41,11 +52,6 @@ public class ApplicationConfig {
     @Bean
     public AuditRepository auditRepository() {
         return new InMemoryAuditRepository();
-    }
-
-    @Bean
-    public PaymentProviderGateway paymentProviderGateway() {
-        return new LocalPaymentProviderGateway();
     }
 
     @Bean
@@ -81,6 +87,29 @@ public class ApplicationConfig {
     }
 
     @Bean
+    public CustomerReviewDataGateway customerReviewDataGateway() {
+        return new InMemoryCustomerReviewDataGateway();
+    }
+
+    @Bean
+    public ManualReviewQueuePolicy manualReviewQueuePolicy(ManualReviewQueueProperties manualReviewQueueProperties) {
+        return new ManualReviewQueuePolicy(manualReviewQueueProperties);
+    }
+
+    @Bean
+    public GetManualReviewQueueUseCase getManualReviewQueueUseCase(
+            PaymentRepository paymentRepository,
+            CustomerReviewDataGateway customerReviewDataGateway,
+            ManualReviewQueuePolicy manualReviewQueuePolicy,
+            ManualReviewQueueProperties manualReviewQueueProperties) {
+        return new GetManualReviewQueueUseCaseImpl(
+                paymentRepository,
+                customerReviewDataGateway,
+                manualReviewQueuePolicy,
+                manualReviewQueueProperties);
+    }
+
+    @Bean
     public HandlePaymentWebhookUseCase handlePaymentWebhookUseCase(
             PaymentRepository paymentRepository,
             AuditRepository auditRepository,
@@ -94,8 +123,12 @@ public class ApplicationConfig {
     @Bean
     public PaymentHandler paymentHandler(
             CreatePaymentUseCase createPaymentUseCase,
-            GetPaymentUseCase getPaymentUseCase) {
-        return new PaymentHandler(createPaymentUseCase, getPaymentUseCase);
+            GetPaymentUseCase getPaymentUseCase,
+            GetManualReviewQueueUseCase getManualReviewQueueUseCase) {
+        return new PaymentHandler(
+                createPaymentUseCase,
+                getPaymentUseCase,
+                getManualReviewQueueUseCase);
     }
 
     @Bean
